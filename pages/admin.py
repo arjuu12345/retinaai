@@ -1,5 +1,9 @@
 import streamlit as st
 import os
+import sys
+
+# Fix import path for Streamlit pages
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from database import (
     init_db,
@@ -165,3 +169,4 @@ with tab2:
 
     else:
         st.info("No approved appointments.")
+
