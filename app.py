@@ -1,7 +1,7 @@
 import streamlit as st
 import torch
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageStat # Added ImageStat for validation
 import datetime
 import os
 import pandas as pd
@@ -17,7 +17,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 
-init_db()
 # -----------------------------
 # 1. Initialize Session State
 # -----------------------------
@@ -79,7 +78,19 @@ def get_local_response(user_input):
     return None
 
 # -----------------------------
-# 3. Page Configuration & Professional Styling
+# 3. Validation Logic: Domain Checker
+# -----------------------------
+def is_fundus_image(img):
+    """Checks if image color profile matches a retinal fundus scan."""
+    stats = ImageStat.Stat(img)
+    avg_r, avg_g, avg_b = stats.mean[:3]
+    # Retinal images are predominantly Red and Green (yellowish-orange/red) with very low Blue
+    is_warm = avg_r > avg_g > avg_b
+    is_not_empty = sum(stats.mean) > 30 # Avoid pitch black images
+    return is_warm and is_not_empty
+
+# -----------------------------
+# 4. Page Configuration & Professional Styling
 # -----------------------------
 st.set_page_config(page_title="RetinaAI Pro Dashboard", page_icon="👁️", layout="wide")
 
@@ -97,7 +108,7 @@ if not os.path.exists("reports"):
     os.makedirs("reports")
 
 # -----------------------------
-# 4. Sidebar: Smart Hybrid Chatbot
+# 5. Sidebar: Smart Hybrid Chatbot
 # -----------------------------
 API_KEY = "AIzaSyCFDqm2At0S9H0Dl21DABtZekrRA_P0Cqs" 
 
@@ -142,7 +153,7 @@ with st.sidebar:
                         st.error("Switching to Offline Mode: API Limit Reached.")
 
 # -----------------------------
-# 5. Main Content: Patient Management
+# 6. Main Content: Patient Management
 # -----------------------------
 st.title("🏥 RetinaAI: Deep Learning Diagnostic Suite")
 st.markdown("---")
@@ -152,7 +163,7 @@ col_info, col_img = st.columns([1, 1], gap="large")
 with col_info:
     st.subheader("📋 Patient Registration")
     with st.container(border=True):
-        patient_name = st.text_input("Patient Full Name", placeholder="e.g. John Doe")
+        patient_name = st.text_input("Patient Full Name", placeholder="e.g. John Doe").strip()
         doctor = st.selectbox("Assign Specialist", ["Dr. Rajesh (Retina)", "Dr. Meera (Ophth.)", "Dr. Arun (General)"])
         appointment_date = st.date_input("Consultation Date", datetime.date.today())
 
@@ -171,7 +182,7 @@ with col_img:
         st.image(image, caption="Current Retinal Scan", use_container_width=True)
 
 # -----------------------------
-# 6. AI Inference & Advanced Visualization
+# 7. AI Inference & Advanced Visualization
 # -----------------------------
 @st.cache_resource
 def get_model():
@@ -182,126 +193,66 @@ classes = ["No DR", "Mild", "Moderate", "Severe", "Proliferative"]
 
 def generate_report(patient, prediction, confidence, image):
     filename = f"reports/{patient}_{int(datetime.datetime.now().timestamp())}.pdf"
-    
-    # Initialize Document
-    doc = SimpleDocTemplate(filename, pagesize=(612, 792)) # Standard Letter size
+    doc = SimpleDocTemplate(filename, pagesize=(612, 792))
     styles = getSampleStyleSheet()
     elements = []
 
-    # --- 1. Header Section ---
-    title_style = ParagraphStyle(
-        'MainTitle', parent=styles['Title'], fontSize=22, textColor=colors.dodgerblue, 
-        spaceAfter=10, alignment=1 # Center
-    )
+    title_style = ParagraphStyle('MainTitle', parent=styles['Title'], fontSize=22, textColor=colors.dodgerblue, spaceAfter=10, alignment=1)
     elements.append(Paragraph("RetinaAI Pro Diagnostic Report", title_style))
     elements.append(Paragraph(f"Generated on: {datetime.datetime.now().strftime('%B %d, %Y - %H:%M')}", styles['Italic']))
     elements.append(Spacer(1, 20))
 
-    # --- 2. Patient & Result Table ---
-    # Creating a structured table for better readability
-    data = [
-        ["Field", "Value"],
-        ["Patient Name:", patient],
-        ["Assigned Doctor:", doctor],
-        ["AI Detection Result:", prediction],
-        ["Confidence Score:", f"{confidence:.2f}%"]
-    ]
-    
+    data = [["Field", "Value"], ["Patient Name:", patient], ["Assigned Doctor:", doctor], ["AI Detection Result:", prediction], ["Confidence Score:", f"{confidence:.2f}%"]]
     t = Table(data, colWidths=[2*inch, 3.5*inch])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.dodgerblue),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 11),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.aliceblue),
-        ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey)
-    ]))
+    t.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.dodgerblue), ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke), ('ALIGN', (0, 0), (-1, -1), 'LEFT'), ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'), ('FONTSIZE', (0, 0), (-1, -1), 11), ('BOTTOMPADDING', (0, 0), (-1, -1), 10), ('BACKGROUND', (0, 1), (-1, -1), colors.aliceblue), ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey)]))
     elements.append(t)
     elements.append(Spacer(1, 25))
 
-    # --- 3. Retinal Image Section ---
     elements.append(Paragraph("Analyzed Retinal Fundus Scan:", styles['Heading2']))
     elements.append(Spacer(1, 10))
-    
     temp_img_path = f"reports/temp_{patient}.png"
     image.save(temp_img_path)
-    # Scale image to fit nicely
     elements.append(RLImage(temp_img_path, width=4*inch, height=4*inch))
     elements.append(Spacer(1, 20))
 
-    # --- 4. Detailed AI Interpretation ---
     elements.append(Paragraph("Clinical Interpretation & Guidance:", styles['Heading2']))
-    
-    # Dynamic text based on prediction
-    interpretation_text = ""
-    if prediction == "No DR":
-        interpretation_text = "The AI model detected no visible signs of diabetic retinopathy. Continue routine diabetic eye screening annually."
-    elif prediction == "Mild" or prediction == "Moderate":
-        interpretation_text = "Early signs of vascular damage detected. Retinal microaneurysms or small hemorrhages may be present. Close monitoring of blood glucose is recommended."
-    else:
-        interpretation_text = "SIGNIFICANT DAMAGE DETECTED. The model suggests Severe/Proliferative DR. This requires urgent consultation with a retina specialist for potential laser or injection therapy."
-
+    interpretation_text = "Urgent specialist referral required." if prediction in ["Severe", "Proliferative"] else "Monitor blood glucose and schedule annual checkups."
     elements.append(Paragraph(interpretation_text, styles['Normal']))
     elements.append(Spacer(1, 30))
 
-    # --- 5. Footer / Disclaimer ---
     disclaimer_style = ParagraphStyle('Disclaimer', parent=styles['Normal'], fontSize=8, textColor=colors.grey)
-    disclaimer_text = ("<b>Disclaimer:</b> This report is generated by an Artificial Intelligence system for research and screening support. "
-                       "It does not constitute a legal medical diagnosis. A licensed ophthalmologist must verify these findings "
-                       "through a clinical dilated eye examination.")
-    elements.append(Paragraph(disclaimer_text, disclaimer_style))
-
-    # Build PDF
+    elements.append(Paragraph("<b>Disclaimer:</b> Research-based screening support. Verify findings with a clinical exam.", disclaimer_style))
     doc.build(elements)
     return filename
 
 if uploaded_file and st.button("🔍 START AI DIAGNOSTICS"):
     if not patient_name:
         st.warning("Patient name required for report generation.")
+    elif not is_fundus_image(image):
+        st.error("❌ Invalid Image: The uploaded file does not appear to be a Retinal Fundus scan.")
     else:
         with st.spinner("Processing Fundus Image..."):
             img = preprocess(image)
             with torch.no_grad():
                 probs = torch.softmax(model(img), dim=1).numpy()[0]
-            
             pred = np.argmax(probs)
             conf = probs[pred] * 100
-
             st.markdown("---")
             st.header("📊 Diagnostic Results")
-            
-            # Layout for results and charts
             res_left, res_right = st.columns([1, 2])
-
             with res_left:
                 st.metric("Detection", classes[pred])
                 st.metric("Confidence Score", f"{conf:.2f}%")
-                
                 report_path = generate_report(patient_name, classes[pred], conf, image)
                 save_report(patient_name, classes[pred], conf, report_path)
-                
                 with open(report_path, "rb") as f:
                     st.download_button("📩 Download PDF Report", f, file_name=os.path.basename(report_path))
-
             with res_right:
-                # ADVANCED VISUALIZATION: Interactive Plotly Chart
-                viz_df = pd.DataFrame({
-                    "Stage": classes,
-                    "Confidence %": [p * 100 for p in probs]
-                })
-                
-                fig = px.bar(
-                    viz_df, x="Stage", y="Confidence %",
-                    color="Confidence %",
-                    color_continuous_scale="Viridis",
-                    title="Model Probability Distribution",
-                    text_auto='.2s'
-                )
+                viz_df = pd.DataFrame({"Stage": classes, "Confidence %": [p * 100 for p in probs]})
+                fig = px.bar(viz_df, x="Stage", y="Confidence %", color="Confidence %", color_continuous_scale="Viridis", title="Model Probability Distribution", text_auto='.2s')
                 fig.update_layout(margin=dict(l=20, r=20, t=40, b=20), height=350)
                 st.plotly_chart(fig, use_container_width=True)
-
-            # Educational Visual Aid for the User/Teacher
-
             st.info("💡 **Clinical Note:** Stage 3 and 4 (Severe/Proliferative) require immediate referral to a retina specialist.")
+
+
+
