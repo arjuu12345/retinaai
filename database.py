@@ -16,7 +16,7 @@ def init_db():
     )
     """)
 
-    # Reports table (added date column)
+    # Reports table
     c.execute("""
     CREATE TABLE IF NOT EXISTS reports(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,13 +28,19 @@ def init_db():
     )
     """)
 
+    # If the table already exists without date column, add it
+    try:
+        c.execute("ALTER TABLE reports ADD COLUMN date TEXT")
+    except:
+        pass
+
     conn.commit()
     conn.close()
 
 
-# -----------------------------
+# --------------------
 # Appointment Functions
-# -----------------------------
+# --------------------
 
 def add_appointment(patient, doctor, date):
 
@@ -96,16 +102,15 @@ def delete_appointment(appointment_id):
     conn.close()
 
 
-# -----------------------------
+# --------------------
 # Report Functions
-# -----------------------------
+# --------------------
 
 def save_report(patient, prediction, confidence, file_path):
 
     conn = sqlite3.connect("hospital.db")
     c = conn.cursor()
 
-    # Save report with current timestamp
     c.execute(
         """
         INSERT INTO reports(patient_name,prediction,confidence,file_path,date)
