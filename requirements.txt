@@ -1,7 +1,7 @@
 streamlit
 numpy
 pandas
-opencv-python
+opencv-python-headless
 pillow
 plotly
 torch
@@ -18,3 +18,4 @@ reportlab
 GitPython
 watchdog
 google-generativeai
+
