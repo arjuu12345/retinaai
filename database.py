@@ -1,7 +1,11 @@
 import sqlite3
 
 
+# -----------------------------
+# Initialize Database
+# -----------------------------
 def init_db():
+
     conn = sqlite3.connect("hospital.db")
     c = conn.cursor()
 
@@ -28,20 +32,13 @@ def init_db():
     )
     """)
 
-    # If the table already exists without date column, add it
-    try:
-        c.execute("ALTER TABLE reports ADD COLUMN date TEXT")
-    except:
-        pass
-
     conn.commit()
     conn.close()
 
 
-# --------------------
+# -----------------------------
 # Appointment Functions
-# --------------------
-
+# -----------------------------
 def add_appointment(patient, doctor, date):
 
     conn = sqlite3.connect("hospital.db")
@@ -80,12 +77,12 @@ def get_approved():
     return data
 
 
-def approve(id):
+def approve(appointment_id):
 
     conn = sqlite3.connect("hospital.db")
     c = conn.cursor()
 
-    c.execute("UPDATE appointments SET status='Approved' WHERE id=?", (id,))
+    c.execute("UPDATE appointments SET status='Approved' WHERE id=?", (appointment_id,))
 
     conn.commit()
     conn.close()
@@ -102,10 +99,9 @@ def delete_appointment(appointment_id):
     conn.close()
 
 
-# --------------------
+# -----------------------------
 # Report Functions
-# --------------------
-
+# -----------------------------
 def save_report(patient, prediction, confidence, file_path):
 
     conn = sqlite3.connect("hospital.db")
@@ -135,25 +131,18 @@ def get_reports():
     return data
 
 
-def get_reports():
+def get_patient_reports(patient_name):
 
     conn = sqlite3.connect("hospital.db")
     c = conn.cursor()
 
-    # Ensure table exists
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS reports(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        patient_name TEXT,
-        prediction TEXT,
-        confidence TEXT,
-        file_path TEXT,
-        date TEXT
+    c.execute(
+        "SELECT * FROM reports WHERE patient_name=? ORDER BY id DESC",
+        (patient_name,)
     )
-    """)
 
-    c.execute("SELECT * FROM reports ORDER BY id DESC")
     data = c.fetchall()
 
     conn.close()
+
     return data
