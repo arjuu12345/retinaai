@@ -135,16 +135,24 @@ def get_reports():
     return data
 
 
-def get_patient_reports(patient_name):
+def get_reports():
 
     conn = sqlite3.connect("hospital.db")
     c = conn.cursor()
 
-    c.execute(
-        "SELECT * FROM reports WHERE patient_name=? ORDER BY id DESC",
-        (patient_name,)
+    # Ensure table exists
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS reports(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_name TEXT,
+        prediction TEXT,
+        confidence TEXT,
+        file_path TEXT,
+        date TEXT
     )
+    """)
 
+    c.execute("SELECT * FROM reports ORDER BY id DESC")
     data = c.fetchall()
 
     conn.close()
