@@ -17,6 +17,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 
+init_db()
 # -----------------------------
 # 1. Initialize Session State
 # -----------------------------
@@ -302,4 +303,5 @@ if uploaded_file and st.button("🔍 START AI DIAGNOSTICS"):
                 st.plotly_chart(fig, use_container_width=True)
 
             # Educational Visual Aid for the User/Teacher
+
             st.info("💡 **Clinical Note:** Stage 3 and 4 (Severe/Proliferative) require immediate referral to a retina specialist.")
