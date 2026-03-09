@@ -10,13 +10,6 @@ torchaudio
 timm
 huggingface_hub
 safetensors
-google-generativeai
-google-api-python-client
-google-auth
-requests
-protobuf
-grpcio
-grpcio-status>=1.75.1
 altair
 pydeck
 tqdm
